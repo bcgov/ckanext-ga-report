@@ -1,15 +1,14 @@
 import re
 import uuid
 
-from sqlalchemy import Table, Column, MetaData
+from sqlalchemy import Table, Column, MetaData, ForeignKey
 from sqlalchemy import types
-from sqlalchemy.orm import mapper
-from sqlalchemy.sql.expression import cast
+from sqlalchemy.sql import select
+from sqlalchemy.orm import mapper, relation
 from sqlalchemy import func
 
 import ckan.model as model
-
-from lib import GaProgressBar
+from ckan.lib.base import *
 
 log = __import__('logging').getLogger(__name__)
 
@@ -109,45 +108,33 @@ def get_table(name):
     return cached_tables[name]
 
 
-class Identifier:
-    def __init__(self):
-        Identifier.dataset_re = re.compile('/dataset/([^/]+)(/.*)?')
-        Identifier.publisher_re = re.compile('/publisher/([^/]+)(/.*)?')
+def _normalize_url(url):
+    '''Strip off the hostname etc. Do this before storing it.
 
-    def get_package(self, url):
-        # e.g. /dataset/fuel_prices
-        # e.g. /dataset/fuel_prices/resource/e63380d4
-        dataset_match = Identifier.dataset_re.match(url)
-        if dataset_match:
-            dataset_ref = dataset_match.groups()[0]
-        else:
-            dataset_ref = None
-        return dataset_ref
+    >>> normalize_url('http://data.gov.uk/dataset/weekly_fuel_prices')
+    '/dataset/weekly_fuel_prices'
+    '''
+    #return '/' + '/'.join(url.split('/')[3:])
+    return url
 
-    def get_package_and_publisher(self, url):
-        # Example urls:
-        #       /dataset/fuel_prices
-        #       /dataset/d7fc8964-e9da-42ab-8385-cbac70479f4b
-        #       /dataset/fuel_prices/resource/e63380d4
-        dataset_match = Identifier.dataset_re.match(url)
-        if dataset_match:
-            dataset_ref = dataset_match.groups()[0]
-            dataset = model.Package.get(dataset_ref)
-            if dataset:
-                if hasattr(dataset, 'owner_org'):
-                    # CKAN 2+
-                    org = model.Group.get(dataset.owner_org)
-                    org_name = org.name if org else None
-                else:
-                    publisher_groups = dataset.get_groups('organization')
-                    org_name = publisher_groups[0].name if publisher_groups else None
-                return dataset.name, org_name
-            return dataset_ref, None
-        else:
-            publisher_match = Identifier.publisher_re.match(url)
-            if publisher_match:
-                return None, publisher_match.groups()[0]
-        return None, None
+
+def _get_package_and_publisher(url):
+    # e.g. /dataset/fuel_prices
+    # e.g. /dataset/fuel_prices/resource/e63380d4
+    dataset_match = re.match('/dataset/([^/]+)(/.*)?', url)
+    if dataset_match:
+        dataset_ref = dataset_match.groups()[0]
+        dataset = model.Package.get(dataset_ref)
+        if dataset:
+            publisher_groups = dataset.get_groups('organization')
+            if publisher_groups:
+                return dataset_ref,publisher_groups[0].name
+        return dataset_ref, None
+    else:
+        publisher_match = re.match('/organization/([^/]+)(/.*)?', url)
+        if publisher_match:
+            return None, publisher_match.groups()[0]
+    return None, None
 
 def update_sitewide_stats(period_name, stat_name, data, period_complete_day):
     for k,v in data.iteritems():
@@ -177,14 +164,18 @@ def update_sitewide_stats(period_name, stat_name, data, period_complete_day):
 def pre_update_url_stats(period_name):
     q = model.Session.query(GA_Url).\
         filter(GA_Url.period_name==period_name)
-    log.debug("Deleting %d '%s' URL records" % (q.count(), period_name))
+    log.debug("Deleting %d '%s' records" % (q.count(), period_name))
+    q.delete()
+
+    q = model.Session.query(GA_Url).\
+        filter(GA_Url.period_name == 'All')
+    log.debug("Deleting %d 'All' records..." % q.count())
     q.delete()
 
     model.Session.flush()
     model.Session.commit()
     model.repo.commit_and_remove()
     log.debug('...done')
-
 
 def post_update_url_stats():
 
@@ -195,70 +186,43 @@ def post_update_url_stats():
         record regardless of whether the URL has an entry for
         the month being currently processed.
     """
-    q = model.Session.query(GA_Url).\
-        filter_by(period_name='All')
-    log.debug("Deleting %d 'All' URL records..." % q.count())
-    q.delete()
-
-    # For dataset URLs:
-    # Calculate the total views/visits for All months
-    log.debug('Calculating Dataset "All" records')
-    query = '''select package_id, sum(pageviews::int), sum(visits::int)
+    log.debug('Post-processing "All" records...')
+    query = """select url, pageviews::int, visits::int
                from ga_url
-               where package_id != ''
-               group by package_id
-               order by sum(pageviews::int) desc
-               '''
-    res = model.Session.execute(query).fetchall()
-    # Now get the link between dataset and org as the previous
-    # query doesn't return that
-    package_to_org = \
-        model.Session.query(GA_Url.package_id, GA_Url.department_id)\
-             .filter(GA_Url.package_id != None)\
-             .group_by(GA_Url.package_id, GA_Url.department_id)\
-             .all()
-    package_to_org = dict(package_to_org)
-    for package_id, views, visits in res:
+               where url not in (select url from ga_url where period_name ='All')"""
+    connection = model.Session.connection()
+    res = connection.execute(query)
+
+    views, visits = {}, {}
+    # url, views, visits
+    for row in res:
+        views[row[0]] = views.get(row[0], 0) + row[1]
+        visits[row[0]] = visits.get(row[0], 0) + row[2]
+
+    progress_total = len(views.keys())
+    progress_count = 0
+    for key in views.keys():
+        progress_count += 1
+        if progress_count % 100 == 0:
+            log.debug('.. %d/%d done so far', progress_count, progress_total)
+
+        package, publisher = _get_package_and_publisher(key)
+
         values = {'id': make_uuid(),
                   'period_name': "All",
                   'period_complete_day': 0,
-                  'url': '',
-                  'pageviews': views,
-                  'visits': visits,
-                  'department_id': package_to_org.get(package_id, ''),
-                  'package_id': package_id
-                  }
-        model.Session.add(GA_Url(**values))
-
-    # For non-dataset URLs:
-    # Calculate the total views/visits for All months
-    log.debug('Calculating URL "All" records...')
-    query = '''select url, sum(pageviews::int), sum(visits::int)
-               from ga_url
-               where package_id = ''
-               group by url
-               order by sum(pageviews::int) desc
-            '''
-    res = model.Session.execute(query).fetchall()
-
-    for url, views, visits in res:
-        values = {'id': make_uuid(),
-                  'period_name': "All",
-                  'period_complete_day': 0,
-                  'url': url,
-                  'pageviews': views,
-                  'visits': visits,
-                  'department_id': '',
-                  'package_id': ''
+                  'url': key,
+                  'pageviews': views[key],
+                  'visits': visits[key],
+                  'department_id': publisher,
+                  'package_id': package
                   }
         model.Session.add(GA_Url(**values))
     model.Session.commit()
+    log.debug('..done')
 
-    log.debug('Done URL "All" records')
 
-
-def update_url_stats(period_name, period_complete_day, url_data,
-                     print_progress=False):
+def update_url_stats(period_name, period_complete_day, url_data):
     '''
     Given a list of urls and number of hits for each during a given period,
     stores them in GA_Url under the period and recalculates the totals for
@@ -266,26 +230,19 @@ def update_url_stats(period_name, period_complete_day, url_data,
     '''
     progress_total = len(url_data)
     progress_count = 0
-    if print_progress:
-        progress_bar = GaProgressBar(progress_total)
-    urls_in_ga_url_this_period = set(
-        result[0] for result in model.Session.query(GA_Url.url)
-                                     .filter(GA_Url.period_name==period_name)
-                                     .all())
-    identifier = Identifier()
     for url, views, visits in url_data:
         progress_count += 1
-        if print_progress:
-            progress_bar.update(progress_count)
+        if progress_count % 100 == 0:
+            log.debug('.. %d/%d done so far', progress_count, progress_total)
 
-        package, publisher = identifier.get_package_and_publisher(url)
+        package, publisher = _get_package_and_publisher(url)
 
-        if url in urls_in_ga_url_this_period:
-            item = model.Session.query(GA_Url).\
-                filter(GA_Url.period_name==period_name).\
-                filter(GA_Url.url==url).first()
-            item.pageviews = int(item.pageviews or 0) + int(views or 0)
-            item.visits = int(item.visits or 0) + int(visits or 0)
+        item = model.Session.query(GA_Url).\
+            filter(GA_Url.period_name==period_name).\
+            filter(GA_Url.url==url).first()
+        if item:
+            item.pageviews = item.pageviews + views
+            item.visits = item.visits + visits
             if not item.package_id:
                 item.package_id = package
             if not item.department_id:
@@ -300,61 +257,42 @@ def update_url_stats(period_name, period_complete_day, url_data,
                       'visits': visits,
                       'department_id': publisher,
                       'package_id': package
-                      }
+                     }
             model.Session.add(GA_Url(**values))
-            urls_in_ga_url_this_period.add(url)
         model.Session.commit()
 
         if package:
-            counts = \
-                model.Session.query(func.sum(cast(GA_Url.pageviews,
-                                                  types.INTEGER)),
-                                    func.sum(cast(GA_Url.visits,
-                                                  types.INTEGER))
-                                    ) \
-                     .filter(GA_Url.period_name!='All') \
-                     .filter(GA_Url.url==url) \
-                     .all()
-            pageviews, visits = counts[0]
+            old_pageviews, old_visits = 0, 0
+            old = model.Session.query(GA_Url).\
+                filter(GA_Url.period_name=='All').\
+                filter(GA_Url.url==url).all()
+            old_pageviews = sum([int(o.pageviews) for o in old])
+            old_visits = sum([int(o.visits) for o in old])
+
+            entries = model.Session.query(GA_Url).\
+                filter(GA_Url.period_name!='All').\
+                filter(GA_Url.url==url).all()
             values = {'id': make_uuid(),
                       'period_name': 'All',
                       'period_complete_day': 0,
                       'url': url,
-                      'pageviews': pageviews,
-                      'visits': visits,
+                      'pageviews': sum([int(e.pageviews) for e in entries]) + int(old_pageviews),
+                      'visits': sum([int(e.visits or 0) for e in entries]) + int(old_visits),
                       'department_id': publisher,
                       'package_id': package
-                      }
+                     }
 
             model.Session.add(GA_Url(**values))
             model.Session.commit()
 
 
-def pre_update_sitewide_stats(period_name):
-    q = model.Session.query(GA_Stat).\
-        filter(GA_Stat.period_name==period_name)
-    log.debug("Deleting %d '%s' sitewide records..." % (q.count(), period_name))
-    q.delete()
-
-    model.Session.flush()
-    model.Session.commit()
-    model.repo.commit_and_remove()
-    log.debug('...done')
-
-
-def pre_update_social_stats(period_name):
-    q = model.Session.query(GA_ReferralStat).\
-        filter(GA_ReferralStat.period_name==period_name)
-    log.debug("Deleting %d '%s' social records..." % (q.count(), period_name))
-    q.delete()
-
-    model.Session.flush()
-    model.Session.commit()
-    model.repo.commit_and_remove()
-    log.debug('...done')
 
 
 def update_social(period_name, data):
+    # Clean up first.
+    model.Session.query(GA_ReferralStat).\
+        filter(GA_ReferralStat.period_name==period_name).delete()
+
     for url,data in data.iteritems():
         for entry in data:
             source = entry[0]
@@ -377,7 +315,6 @@ def update_social(period_name, data):
                          }
                 model.Session.add(GA_ReferralStat(**values))
             model.Session.commit()
-
 
 def update_publisher_stats(period_name):
     """
@@ -496,5 +433,5 @@ def get_score_for_dataset(dataset_name):
             score += views_per_day
 
     score = int(score * 100)
-    #log.debug('Popularity %s: %s', score, dataset_name)
+    log.debug('Popularity %s: %s', score, dataset_name)
     return score

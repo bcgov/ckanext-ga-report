@@ -112,6 +112,7 @@ CKAN.GA_Reports.bind_sidebar = function() {
       $('#graph-legend-container > *').hide();
       $('#graph-legend-container .instructions').show();
       $(legend_name).show();
+      $("#graph-legend-container").show();
     }
   );
   /* The first tab might already have been shown */
@@ -126,6 +127,6 @@ CKAN.GA_Reports.bind_month_selector = function() {
     window.location = url;
   };
   var selectors = $('select[name="month"]');
-  assert(selectors.length>0);
+  //assert(selectors.length>0);
   selectors.bind('change', handler);
 };

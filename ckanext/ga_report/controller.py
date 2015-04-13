@@ -29,18 +29,7 @@ def _get_unix_epoch(strdate):
 
 def _month_details(cls, stat_key=None):
     '''
-    Returns a list of all the periods for which we have data and the date we've
-    got data up to in the latest month.
-
-    e.g. ([(u'2014-11', 'November 2014'),
-           (u'2014-10', 'October 2014'),
-           (u'2014-09', 'September 2014')],
-           '27th')
-       i.e. we have 3 months up to 27th November
-
-    :param cls: GA_Stat or GA_Url
-
-    unfortunately
+    Returns a list of all the periods for which we have data, unfortunately
     knows too much about the type of the cls being passed as GA_Url has a
     more complex query
 
@@ -49,24 +38,21 @@ def _month_details(cls, stat_key=None):
     months = []
     day = None
 
-    q = model.Session.query(cls.period_name, cls.period_complete_day)\
-             .filter(cls.period_name!='All') \
-             .distinct(cls.period_name)
+    q = model.Session.query(cls.period_name,cls.period_complete_day)\
+        .filter(cls.period_name!='All').distinct(cls.period_name)
     if stat_key:
-        q = q.filter(cls.stat_name==stat_key)
+        q=  q.filter(cls.stat_name==stat_key)
 
     vals = q.order_by("period_name desc").all()
 
-    # For the most recent month, add 'ordinal' to the day
-    # e.g. '27' -> day='27th'
     if vals and vals[0][1]:
         day = int(vals[0][1])
         ordinal = 'th' if 11 <= day <= 13 \
-            else {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10, 'th')
+            else {1:'st',2:'nd',3:'rd'}.get(day % 10, 'th')
         day = "{day}{ordinal}".format(day=day, ordinal=ordinal)
 
     for m in vals:
-        months.append((m[0], _get_month_name(m[0])))
+        months.append( (m[0], _get_month_name(m[0])))
 
     return months, day
 
@@ -92,6 +78,7 @@ class GaReport(BaseController):
                              entry.stat_name.encode('utf-8'),
                              entry.key.encode('utf-8'),
                              entry.value.encode('utf-8')])
+
 
     def index(self):
 
@@ -257,7 +244,7 @@ class GaDatasetReport(BaseController):
         '''
         c.month = month if not month == 'all' else ''
         response.headers['Content-Type'] = "text/csv; charset=utf-8"
-        response.headers['Content-Disposition'] = str('attachment; filename=publishers_%s.csv' % (month,))
+        response.headers['Content-Disposition'] = str('attachment; filename=organizations_%s.csv' % (month,))
 
         writer = csv.writer(response)
         writer.writerow(["Publisher Title", "Publisher Name", "Views", "Visits", "Period Name"])
@@ -282,7 +269,7 @@ class GaDatasetReport(BaseController):
         if id != 'all':
             c.publisher = model.Group.get(id)
             if not c.publisher:
-                abort(404, 'A publisher with that name could not be found')
+                abort(404, 'An organization with that name could not be found')
 
         packages = self._get_packages(publisher=c.publisher, month=c.month)
         response.headers['Content-Type'] = "text/csv; charset=utf-8"
@@ -317,7 +304,7 @@ class GaDatasetReport(BaseController):
         graph_data = _get_top_publishers_graph()
         c.top_publishers_graph = json.dumps( _to_rickshaw(graph_data) )
 
-        x = render('ga_report/publisher/index.html')
+        x =  render('ga_report/publisher/index.html')
 
         return x
 
@@ -328,17 +315,9 @@ class GaDatasetReport(BaseController):
         if month != 'All':
             have_download_data = month >= DOWNLOADS_AVAILABLE_FROM
 
-        if have_download_data:
-            download_stats_query = model.Session.query(GA_Stat.key, func.sum(cast(GA_Stat.value, sqlalchemy.types.Integer)))
-            download_stats_query = download_stats_query.filter(GA_Stat.stat_name=='Downloads')
-            if month != 'All':
-                download_stats_query = download_stats_query.filter(GA_Stat.period_name==month)
-            download_stats_query = download_stats_query.group_by(GA_Stat.key).all()
-            download_stats = dict(download_stats_query)
-
         q = model.Session.query(GA_Url,model.Package)\
             .filter(model.Package.name==GA_Url.package_id)\
-            .filter(GA_Url.package_id != '')
+            .filter(GA_Url.url.like('/dataset/%'))
         if publisher:
             q = q.filter(GA_Url.department_id==publisher.name)
         q = q.filter(GA_Url.period_name==month)
@@ -353,7 +332,14 @@ class GaDatasetReport(BaseController):
             if package:
                 # Downloads ....
                 if have_download_data:
-                    downloads = download_stats.get(package.name, 0)
+                    dls = model.Session.query(GA_Stat).\
+                        filter(GA_Stat.stat_name=='Downloads').\
+                        filter(GA_Stat.key==package.name)
+                    if month != 'All':  # Fetch everything unless the month is specific
+                        dls = dls.filter(GA_Stat.period_name==month)
+                    downloads = 0
+                    for x in dls:
+                        downloads += int(x.value)
                 else:
                     downloads = 'No data'
                 top_packages.append((package, entry.pageviews, entry.visits, downloads))
@@ -373,14 +359,14 @@ class GaDatasetReport(BaseController):
         Lists the most popular datasets for a publisher (or across all publishers)
         '''
         count = 20
-
+        
         c.publishers = _get_publishers()
 
         id = request.params.get('publisher', id)
         if id and id != 'all':
             c.publisher = model.Group.get(id)
             if not c.publisher:
-                abort(404, 'A publisher with that name could not be found')
+                abort(404, 'An organization with that name could not be found')
             c.publisher_name = c.publisher.name
         c.top_packages = [] # package, dataset_views in c.top_packages
 
@@ -398,7 +384,7 @@ class GaDatasetReport(BaseController):
         month = c.month or 'All'
         c.publisher_page_views = 0
         q = model.Session.query(GA_Url).\
-            filter(GA_Url.url=='/publisher/%s' % c.publisher_name)
+            filter(GA_Url.url=='/organization/%s' % c.publisher_name)
         entry = q.filter(GA_Url.period_name==c.month).first()
         c.publisher_page_views = entry.pageviews if entry else 0
 
@@ -435,11 +421,11 @@ def _to_rickshaw(data, percentageMode=False):
     x_axis = x_axis[:-1] # Remove latest month
     totals = {}
     for series in data:
-        series['data'] = []
+        series["data"] = []
         for x_string in x_axis:
             x = _get_unix_epoch( x_string )
-            y = series['raw'].get(x_string,0)
-            series['data'].append({'x':x,'y':y})
+            y = series["raw"].get(x_string,0)
+            series["data"].append({"x":x,"y":y})
             totals[x] = totals.get(x,0)+y
     if not percentageMode:
         return data
@@ -449,14 +435,11 @@ def _to_rickshaw(data, percentageMode=False):
     raw_data = data
     data = []
     for series in raw_data:
-        for point in series['data']:
-            try:
-                percentage = (100*float(point['y'])) / totals[point['x']]
-            except ZeroDivisionError:
-                percentage = 0
+        for point in series["data"]:
+            percentage = (100*float(point["y"])) / totals[point["x"]]
             if not (series in data) and percentage>THRESHOLD:
                 data.append(series)
-            point['y'] = percentage
+            point["y"] = percentage
     others = [ x for x in raw_data if not (x in data) ]
     if len(others):
         data_other = []
@@ -464,11 +447,11 @@ def _to_rickshaw(data, percentageMode=False):
             x = _get_unix_epoch(x_axis[i])
             y = 0
             for series in others:
-                y += series['data'][i]['y']
-            data_other.append({'x':x,'y':y})
+                y += series["data"][i]["y"]
+            data_other.append({"x":x,"y":y})
         data.append({
-            'name':'Other',
-            'data': data_other
+            "name":"Other",
+            "data": data_other
             })
     return data
 
@@ -485,6 +468,7 @@ def _get_top_publishers(limit=20):
         from ga_url
         where department_id <> ''
           and package_id <> ''
+          and url like '/dataset/%%'
           and period_name=%s
         group by department_id order by views desc
         """
@@ -511,6 +495,7 @@ def _get_top_publishers_graph(limit=20):
         from ga_url
         where department_id <> ''
           and package_id <> ''
+          and url like '/dataset/%%'
           and period_name='All'
         group by department_id order by views desc
         """
