@@ -21,7 +21,8 @@ setup(
 	zip_safe=False,
 	install_requires=[
 		'gdata',
-		'google-api-python-client'
+		'google-api-python-client==1.4.1',
+                'oauth2client==1.4.12',
 	],
 	entry_points=\
 	"""
