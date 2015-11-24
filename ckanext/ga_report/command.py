@@ -31,19 +31,17 @@ class InitDB(CkanCommand):
 
 
 class GetAuthToken(CkanCommand):
-    """ Gets the auth token from Google and saves it as token.dat.
+    """ Get's the Google auth token
 
     Usage: paster getauthtoken <credentials_file>
 
     Where <credentials_file> is the file name containing the details
-    of your client authorized for your Google Analytics data
-    (known as credentials.json or client_secrets.json)
-    which is obtained from https://code.google.com/apis/console.
+    for the service (obtained from https://code.google.com/apis/console).
     By default this is set to credentials.json
     """
     summary = __doc__.split('\n')[0]
     usage = __doc__
-    max_args = 1
+    max_args = 0
     min_args = 0
 
     def command(self):
@@ -84,7 +82,7 @@ class FixTimePeriods(CkanCommand):
         log = logging.getLogger('ckanext.ga_report')
 
         log.info("Updating 'All' records for old URLs")
-        post_update_url_stats(print_progress=True)
+        post_update_url_stats()
         log.info("Processing complete")
 
 
@@ -107,17 +105,16 @@ class LoadAnalytics(CkanCommand):
 
     def __init__(self, name):
         super(LoadAnalytics, self).__init__(name)
-        self.stat_names = ('url', 'url-all', 'sitewide', 'social')
         self.parser.add_option('-d', '--delete-first',
                                action='store_true',
                                default=False,
                                dest='delete_first',
                                help='Delete data for the period first')
-        self.parser.add_option('-s', '--stat',
-                               metavar="STAT",
-                               dest='stat',
-                               help='Only calulcate a particular stat (or collection of stats)- one of: %s' %
-                                    '|'.join(self.stat_names))
+        self.parser.add_option('-s', '--skip_url_stats',
+                               action='store_true',
+                               default=False,
+                               dest='skip_url_stats',
+                               help='Skip the download of URL data - just do site-wide stats')
         self.token = ""
 
     def command(self):
@@ -142,8 +139,7 @@ class LoadAnalytics(CkanCommand):
 
         downloader = DownloadAnalytics(svc, self.token, profile_id=get_profile_id(svc),
                                        delete_first=self.options.delete_first,
-                                       stat=self.options.stat,
-                                       print_progress=True)
+                                       skip_url_stats=self.options.skip_url_stats)
 
         time_period = self.args[0] if self.args else 'latest'
         if time_period == 'all':
