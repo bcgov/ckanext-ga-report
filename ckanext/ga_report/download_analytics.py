@@ -2,6 +2,7 @@ import os
 import logging
 import datetime
 import httplib
+import urllib2
 import collections
 import requests
 import json
@@ -466,7 +467,7 @@ class DownloadAnalytics(object):
                 if progress_count % 100 == 0:
                     log.debug('.. %d/%d done so far', progress_count, progress_total)
 
-                url = result[0].strip()
+                url = urllib2.unquote(result[0].strip())
 
                 # Get package id associated with the resource that has this URL.
                 q = model.Session.query(model.Resource)
@@ -476,7 +477,7 @@ class DownloadAnalytics(object):
                 else:
                     r = q.filter(model.Resource.url.like("%s%%" % url)).first()
 
-                package_name = r.resource_group.package.name if r else ""
+                package_name = r.package.name if r else ""
                 print 'Package_name for resoure : ', package_name
                 if package_name:
                     data[package_name] = data.get(package_name, 0) + int(result[1])
@@ -484,7 +485,7 @@ class DownloadAnalytics(object):
                     resources_not_matched.append(url)
                     continue
             if resources_not_matched:
-                log.debug('Could not match %i or %i resource URLs to datasets. e.g. %r',
+                log.debug('Could not match %i of %i resource URLs to datasets. e.g. %r',
                           len(resources_not_matched), progress_total, resources_not_matched[:3])
 
         log.info('Associating downloads of resource URLs with their respective datasets')
