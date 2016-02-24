@@ -20,7 +20,7 @@ setup(
 	zip_safe=False,
 	install_requires=[
 		'gdata',
-                'oauth2client==1.4.12'
+                'oauth2client'
 	],
 	entry_points=\
 	"""
