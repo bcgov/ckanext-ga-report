@@ -126,14 +126,14 @@ class DownloadAnalytics(object):
                 data = self.download(start_date, end_date, '~/dataset/[a-z0-9-_]+')
                 
                 log.info('Storing dataset views (%i rows)', len(data.get('url')))
-                self.store(period_name, period_complete_day, data, )
+                self.store(period_name, period_complete_day, data)
 
                 log.info('Downloading analytics for organization views')
                 #data = self.download(start_date, end_date, '~/%s/publisher/[a-z0-9-_]+' % accountName)
                 data = self.download(start_date, end_date, '~/organization/[a-z0-9-_]+')
 
                 #log.info('Storing publisher views (%i rows)', len(data.get('url')))
-                self.store(period_name, period_complete_day, data,)
+                self.store(period_name, period_complete_day, data)
 
                 # Make sure the All records are correct.
                 ga_model.post_update_url_stats()
@@ -217,7 +217,7 @@ class DownloadAnalytics(object):
         log.info(self.profile_id)
         log.info(results)
         log.info(self.profile_id)
-        
+
         packages = []
         log.info("There are %d results" % results['totalResults'])
         if 'rows' not in results :
@@ -234,7 +234,7 @@ class DownloadAnalytics(object):
                 # /data/user/login?came_from=http://data.gov.uk/dataset/os-code-point-open
                 # /403.html?page=/about&from=http://data.gov.uk/publisher/planning-inspectorate
                 continue
-            packages.append( (url, pageviews, visits,) ) # Temporary hack
+            packages.append( (url, pageviews, visits) ) # Temporary hack
         return dict(url=packages)
 
     def store(self, period_name, period_complete_day, data):
@@ -264,8 +264,8 @@ class DownloadAnalytics(object):
     def _get_json(self, params, prev_fail=False):
         ga_token_filepath = os.path.expanduser(config.get('googleanalytics.token.filepath', ''))
         if not ga_token_filepath:
-            print 'ERROR: In the CKAN config you need to specify the filepath of the ' \
-                'Google Analytics token file under key: googleanalytics.token.filepath'
+            print('ERROR: In the CKAN config you need to specify the filepath of the ' \
+                'Google Analytics token file under key: googleanalytics.token.filepath')
             return
 
         log.info("Trying to refresh our OAuth token")
@@ -436,7 +436,7 @@ class DownloadAnalytics(object):
             args["end-date"] = end_date
             args["ids"] = "ga:" + self.profile_id
 
-            args["filters"] = 'ga:eventAction==download'
+            args["filters"] = 'ga:eventAction==Download'
             args["dimensions"] = "ga:eventLabel"
             args["metrics"] = "ga:totalEvents"
             args["alt"] = "json"
@@ -448,9 +448,7 @@ class DownloadAnalytics(object):
             results = dict(url=[])
 
         result_data = results.get('rows')
-        import pprint
-        print "Download data: "
-        pprint.pprint(result_data)
+ 
         if not result_data:
             # We may not have data for this time period, so we need to bail
             # early.
@@ -472,13 +470,13 @@ class DownloadAnalytics(object):
                 # Get package id associated with the resource that has this URL.
                 q = model.Session.query(model.Resource)
                 if cached:
-                    print "Cached download."
+                    log.info("Cached download.")
                     r = q.filter(model.Resource.cache_url.like("%s%%" % url)).first()
                 else:
                     r = q.filter(model.Resource.url.like("%s%%" % url)).first()
 
                 package_name = r.package.name if r else ""
-                print 'Package_name for resoure : ', package_name
+                log.info('Package_name for resource: %s' % package_name)
                 if package_name:
                     data[package_name] = data.get(package_name, 0) + int(result[1])
                 else:
@@ -489,6 +487,7 @@ class DownloadAnalytics(object):
                           len(resources_not_matched), progress_total, resources_not_matched[:3])
 
         log.info('Associating downloads of resource URLs with their respective datasets')
+        log.info('Response Results for Resource Downloads: %s' % results)
         process_result_data(results.get('rows'))
 
         try:
