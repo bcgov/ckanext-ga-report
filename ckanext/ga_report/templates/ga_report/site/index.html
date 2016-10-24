@@ -102,7 +102,7 @@
             </ul>
             <div class="tab-content" style="display:block;">
               <div class="tab-pane active" id="totals">
-                   <form class="form-inline" action="${h.url_for(controller='ckanext.ga_report.controller:GaReport',action='index')}" method="get">
+                   <form class="form-inline" action="{{ h.url_for(controller='ckanext.ga_report.controller:GaReport',action='index') }}" method="get">
                      <h4 class="ga-reports-heading">Show stats table for:</h4>
                      {% snippet 'snippets/month_selector.html', current_moth=c.month, months=c.months, day=c.day %}
                    </form>
