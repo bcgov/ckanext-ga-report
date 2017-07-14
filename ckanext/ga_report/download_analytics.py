@@ -124,7 +124,7 @@ class DownloadAnalytics(object):
                 log.info('Downloading analytics for dataset views')
                 #data = self.download(start_date, end_date, '~/%s/dataset/[a-z0-9-_]+' % accountName)
                 data = self.download(start_date, end_date, '~/dataset/[a-z0-9-_]+')
-                
+
                 log.info('Storing dataset views (%i rows)', len(data.get('url')))
                 self.store(period_name, period_complete_day, data)
 
@@ -209,7 +209,7 @@ class DownloadAnalytics(object):
             args["alt"] = "json"
 
             results = self._get_json(args)
-        
+
         except Exception, e:
             log.exception(e)
             return dict(url=[])
@@ -224,11 +224,11 @@ class DownloadAnalytics(object):
             return dict(url=packages)
         for entry in results.get('rows'):
             (loc,pageviews,visits) = entry
-            
-            #url = _normalize_url('http:/' + loc) # strips off domain e.g. www.data.gov.uk or data.gov.uk
-            url = loc 
 
-            
+            #url = _normalize_url('http:/' + loc) # strips off domain e.g. www.data.gov.uk or data.gov.uk
+            url = loc
+
+
             if not url.startswith('/dataset/') and not url.startswith('/organization/'):
                 # filter out strays like:
                 # /data/user/login?came_from=http://data.gov.uk/dataset/os-code-point-open
@@ -325,7 +325,7 @@ class DownloadAnalytics(object):
             args["end-date"] = end_date
             args["ids"] = "ga:" + self.profile_id
 
-            args["metrics"] = "ga:pageviewsPerVisit,ga:avgTimeOnSite,ga:percentNewVisits,ga:visits"
+            args["metrics"] = "ga:pageviewsPerVisit,ga:avgSessionDuration,ga:percentNewVisits,ga:visits"
             args["alt"] = "json"
 
             results = self._get_json(args)
@@ -440,15 +440,15 @@ class DownloadAnalytics(object):
             args["dimensions"] = "ga:eventLabel"
             args["metrics"] = "ga:totalEvents"
             args["alt"] = "json"
-            
-                        
+
+
             results = self._get_json(args)
         except Exception, e:
             log.exception(e)
             results = dict(url=[])
 
         result_data = results.get('rows')
- 
+
         if not result_data:
             # We may not have data for this time period, so we need to bail
             # early.
@@ -664,9 +664,9 @@ class DownloadAnalytics(object):
 
 
         result_data = results.get('rows')
-        
+
         if not result_data : return
-        
+
         data = {}
         for result in result_data:
             data[result[0]] = data.get(result[0], 0) + int(result[2])
