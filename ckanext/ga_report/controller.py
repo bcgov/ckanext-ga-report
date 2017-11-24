@@ -5,7 +5,8 @@ import json
 import logging
 import operator
 import collections
-from ckan.lib.base import (BaseController, c, g, render, request, response, abort)
+from ckan.lib.base import (BaseController, c, render, request, response, abort)
+from ckan.plugins import toolkit
 
 import sqlalchemy
 from sqlalchemy import func, cast, Integer
@@ -169,7 +170,7 @@ class GaReport(BaseController):
 
         def fill_out_url(url):
             import urlparse
-            return urlparse.urljoin(g.site_url, url)
+            return urlparse.urljoin(toolkit.config.get('ckan.site_url'), url)
 
         c.social_referrer_totals, c.social_referrers = [], []
         q = model.Session.query(GA_ReferralStat)
