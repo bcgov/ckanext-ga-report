@@ -11,8 +11,9 @@
 .rickshaw_chart_container {
   position: relative;
   height: 350px;
-  margin: 0 auto 20px auto;
+  margin-top: 70px;
 }
+
 .rickshaw_chart {
   position: absolute;
   left: 40px;
@@ -20,16 +21,19 @@
   top: 0;
   bottom: 0;
 }
+#graph-legend-container {
+  padding: 12px;
+}
 .rickshaw_legend {
   background: transparent;
-  width: 100%;
+  padding: 0;
   padding-top: 4px;
 }
 .rickshaw_y_axis {
   position: absolute;
+  max-width: 40px;
+  left: 0;
   top: 0;
-  bottom: 0;
-  width: 40px;
 }
 .rickshaw_legend .label {
   background: transparent !important;
@@ -103,7 +107,7 @@
 	margin : 0px;
 }
 
-.row {
+.ga.row {
     margin : 0px;
     padding-top : 10px;
 }
@@ -132,4 +136,15 @@ ul li {
 
 .ga-report-divider {
     margin : 2px;
+}
+
+@media (max-width: 767px) {
+  .rickshaw_chart_container {
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
+
+  #graph-legend-container strong {
+    display: block;
+  }
 }

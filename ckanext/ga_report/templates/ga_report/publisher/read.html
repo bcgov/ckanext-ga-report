@@ -34,38 +34,41 @@
 
 {% block primary_content %}
 	{% set download_link = h.url_for(controller='ckanext.ga_report.controller:GaDatasetReport',action='dataset_csv',id=c.publisher_name or 'all',month=c.month or 'all') %}
-	<div class="row">
+	<div class="ga row">
      	<div class="ga-header">
-      		<a class="btn button btn-primary btn-sm pull-right" href="{{ download_link }}"><i class="icon-download"></i>&nbsp; Download as CSV</a>
+      		<a class="btn button btn-primary btn-sm pull-right" href="{{ download_link }}"><i class="fa fa-download icon-download"></i>Download as CSV</a>
     		<h3>Site Usage
     		{% if c.publisher %}
         		<small> {{ c.publisher.title }}</small>
     		{% else %}
-        		<small>All datasets</small>
+        		<small> All datasets</small>
     		{% endif %}
     		</h3>
     	</div>
 	</div>
-    <hr class="ga-report-divider" />
-    <div class="row" style="background: #fff;">
-      <div class="col-md-4">
-        <div class="whitebox">
+  
+  <hr class="ga-report-divider" />
+  
+  <div class="row-fluid">
+    <div class="ga row-fluid">
+      <div class="span4">
+        <div id="graph-legend-container">
           <strong>Graph Legend</strong>
-          <div id="graph-legend-container">
-            <div style="display: none;" id="legend_none">(No graph is loaded)</div>
-          </div>
+          <div style="display: none;" id="legend_none">(No graph is loaded)</div>
         </div>
       </div>
-      <div class="col-md-8">
-        <div class="whitebox">
+
+      <div class="span8">
         {% if c.graph_data %}
-            {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
-	    {% endif %}
-       </div>
+          {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
+        {% endif %}
       </div>
     </div>
-    <hr class="ga-report-divider" />
-	<div class="stat-details" >
+  </div>
+  
+  <hr class="ga-report-divider" />
+	
+  <div class="stat-details" >
     {% if c.month %}
      <h4>Statistics for {{ h.month_option_title(c.month,c.months,c.day) }}:</h4>
    {% else %}
