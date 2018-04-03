@@ -8,17 +8,20 @@
   color: transparent;
   overflow: hidden;
 }
+.ga.flex {
+  display: flex;
+  padding: 12px;
+  justify-content: center;
+  align-items: baseline;
+}
 .rickshaw_chart_container {
   display: inline-block;
   position: relative;
   height: 350px;
   margin-top: 26px;
 }
-#chart-wrapper {
-  padding-top: 11px;
-}
 #graph-controls {
-  padding-left: 25px;
+  padding-left: 14px;
 }
 #graph-controls select {
   font-size: 12px;
@@ -36,9 +39,6 @@
   width: 500px;
   top: 0;
   bottom: 0;
-}
-#graph-legend-container {
-  padding: 12px;
 }
 .rickshaw_legend {
   background: transparent;
@@ -155,12 +155,17 @@ ul li {
 }
 
 @media (max-width: 767px) {
-  .rickshaw_chart_container {
-    margin-top: 24px;
+  .ga.flex {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #graph-legend-container {
     margin-bottom: 24px;
   }
 
-  #graph-legend-container strong {
-    display: block;
+  .rickshaw_chart_container {
+    margin-top: 24px;
+    margin-bottom: 24px;
   }
 }

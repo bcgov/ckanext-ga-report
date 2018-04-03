@@ -52,19 +52,15 @@
   <hr class="ga-report-divider" />
   
   <div class="row-fluid">
-    <div class="ga row-fluid">
-      <div class="span4">
-        <div id="graph-legend-container">
-          <strong>Graph Legend</strong>
-          <div style="display: none;" id="legend_none">(No graph is loaded)</div>
-        </div>
+    <div class="ga flex">
+      <div id="graph-legend-container">
+        <h5>Graph Legend</h5>
+        <div style="display: none;" id="legend_none">(No graph is loaded)</div>
       </div>
 
-      <div class="span8">
-        {% if c.graph_data %}
-          {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
-        {% endif %}
-      </div>
+      {% if c.graph_data %}
+        {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
+      {% endif %}
     </div>
   </div>
   

@@ -43,6 +43,7 @@ CKAN.GA_Reports.render_rickshaw = function(css_name, data, mode, colorscheme) {
 		element: document.querySelector("#chart_" + css_name),
 		renderer: mode,
 		series: data,
+		width: 488,
 		height: 328
 	});
 
