@@ -1,15 +1,31 @@
 
 <select name="{{ select_name or 'month' }}" id="{{ id_ }}" class="{{ classNames }}">
-	{% if not current_month and not remove_blank %}
+	{% if not graph_control %}
 		<option value='' selected= "selected">All months</option>
 	{% endif %}
-	{% for (iso_code, string_name) in months %}
+
+	{% if graph_control and months|length > 1 %}
 		{% if id_ == 'start-period' %}
-			{% set current_month = months[-1] %}
+			{% set current_month, _f = months[-1] %}
+			{% set opposite, _f = months[1] %}
 		{% elif id_ == 'end-period' %}
-			{% set current_month = months[0] %}
+			{% set current_month, _f = months[1] %}
+			{% set opposite, _f = months[-1] %}
 		{% endif %}
+	{% endif %}
+
+	{% for (iso_code, string_name) in months %}
+		{% if loop.first and graph_control %}
+			{# this condition is to not display the latest month in the list
+				 because when the graph data is made, the _to_rickshaw
+				 function in controller.py drops the latest month #}
+		{% elif opposite == iso_code and graph_control %}
+			{# skips the latest tick for start period and earliest tick for end period #}
+		{% else %}
 		<option value="{{ iso_code }}" {% if current_month == iso_code %}selected="selected"{% endif %}>{{ h.month_option_title(iso_code,months,day) }}</option>
+		{% endif %}
+	{% else %}
+		<option value="">No months available</option>
 	{% endfor %}
 </select>
 

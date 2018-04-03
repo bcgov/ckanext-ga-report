@@ -9,6 +9,7 @@
   overflow: hidden;
 }
 .rickshaw_chart_container {
+  display: inline-block;
   position: relative;
   height: 350px;
   margin-top: 26px;

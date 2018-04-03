@@ -120,6 +120,10 @@ CKAN.GA_Reports.render_rickshaw = function(css_name, data, mode, colorscheme) {
 	graph.render();
 
 	CKAN.GA_Reports.changeGraphPeriod = changeGraphPeriod;
+	CKAN.GA_Reports.updateGraph = function() {
+		graph.configure(arguments);
+		graph.update();
+	};
 };
 
 CKAN.GA_Reports.bind_sparklines = function() {
