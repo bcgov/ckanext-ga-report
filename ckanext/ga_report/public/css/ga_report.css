@@ -11,9 +11,24 @@
 .rickshaw_chart_container {
   position: relative;
   height: 350px;
-  margin-top: 70px;
+  margin-top: 26px;
 }
-
+#chart-wrapper {
+  padding-top: 11px;
+}
+#graph-controls {
+  padding-left: 25px;
+}
+#graph-controls select {
+  font-size: 12px;
+  margin: 0;
+}
+#graph-controls label {
+  margin: 0;
+}
+#graph-controls label[for="end-period"] {
+  margin-left: 7px;
+}
 .rickshaw_chart {
   position: absolute;
   left: 40px;

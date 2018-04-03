@@ -1,10 +1,32 @@
-<div id="chart_container_{{ id }}" class="rickshaw_chart_container">
-  <div id="y_axis_{{ id }}" class="rickshaw_y_axis"></div>
-  <div id="chart_{{ id }}" class="rickshaw_chart"></div>
-  <script type="text/javascript">
-    $(document).ready(function() {
-        var items = {{ items_json|safe }};
-        CKAN.GA_Reports.render_rickshaw('{{ id }}', items, '{{ mode }}', '{{ colorscheme }}');
-    });
-  </script>
+<div id="chart-wrapper">
+	<div id="graph-controls" class="form-inline">
+		<label for="start-period">Start
+			{% snippet 'snippets/month_selector.html', id_='start-period', classNames="", remove_blank=True, months=c.months, day=c.day %}
+		</label>
+
+		<label for="end-period">End
+			{% snippet 'snippets/month_selector.html', id_='end-period', classNames="", remove_blank=True, months=c.months, day=c.day %}
+		</label>
+	</div>
+
+	<div id="chart_container_{{ id }}" class="rickshaw_chart_container">
+		<div id="y_axis_{{ id }}" class="rickshaw_y_axis"></div>
+		<div id="chart_{{ id }}" class="rickshaw_chart"></div>
+		<script type="text/javascript">
+			$(document).ready(function() {
+				var items = {{ items_json|safe }};
+				CKAN.GA_Reports.render_rickshaw('{{ id }}', items, '{{ mode }}', '{{ colorscheme }}');
+
+				var updateGraphPeriod = function(event) {
+					if (this.id === 'start-period')
+						CKAN.GA_Reports.changeGraphPeriod(this.value);
+
+					if (this.id === 'end-period')
+						CKAN.GA_Reports.changeGraphPeriod(undefined, this.value);
+				};
+
+				$('#start-period, #end-period').on('change', updateGraphPeriod);
+			});
+		</script>
+	</div>
 </div>

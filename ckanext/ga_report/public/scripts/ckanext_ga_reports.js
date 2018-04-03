@@ -69,7 +69,57 @@ CKAN.GA_Reports.render_rickshaw = function(css_name, data, mode, colorscheme) {
 
 	myLegend.prepend('<div class="instructions">Click on a series below to isolate its graph:</div>');
 
+	var orgTickOffsets = x_axis.tickOffsets();
+
+	var getTickValue = function(yearMonth) {
+		/**
+		 *  yearMonth should be formatted as 'YYYY-MM' eg. 2016-01
+		 *
+		 *  returns undefined if yearMonth is empty
+		 *  returns unix timestamp in seconds if the month tick is found, else returns 'out-of-range'
+		**/
+		if (yearMonth === undefined)
+			return undefined;
+
+		var tick = orgTickOffsets.find(function(tick) {
+			// the add one month is for graph display, see changeGraphPeriod docstring
+			return moment.unix(tick.value).add(1, 'M').format('YYYY-MM') === yearMonth;
+		});
+
+		if (tick === undefined)
+			console.warn(yearMonth + ' is out of data range.');
+
+		return (tick) ? tick.value : 'out-of-range';
+	};
+
+	var setGraphTicks = function(start, end) {
+		/**
+		 *  Graph object will reset its start or end positions if either input is undefined respectively
+		 *  Providing no argumenets will reset the graph to the original data time range
+		**/
+		if (start && end == undefined)
+			end = graph.window.xMax;  // if only setting the start, keep end as the same
+
+		if (end && start == undefined)
+			start = graph.window.xMin;
+
+		graph.window.xMin = (start === 'out-of-range') ? graph.window.xMin : start;
+		graph.window.xMax = (end === 'out-of-range') ? graph.window.xMax : end;
+
+		graph.update();
+	};
+
+	var changeGraphPeriod = function(start, end) {
+		/**
+		 *  Note that the graph start is the end of month from the data,
+		 *  but displays the next month as the start
+		**/
+		setGraphTicks(getTickValue(start), getTickValue(end));
+	};
+
 	graph.render();
+
+	CKAN.GA_Reports.changeGraphPeriod = changeGraphPeriod;
 };
 
 CKAN.GA_Reports.bind_sparklines = function() {
@@ -97,7 +147,8 @@ CKAN.GA_Reports.bind_sparklines = function() {
 			};
 			
 			$('.sparkline').sparkline('html', sparkOptions);
-				created = true;
+
+			created = true;
 		}
 
 		$.sparkline_display_visible();

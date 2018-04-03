@@ -79,7 +79,7 @@
     <form style="margin-bottom:10px;" class="form-inline" action="{{ h.url_for(controller='ckanext.ga_report.controller:GaDatasetReport',action='read') }}" method="get">
       <div class="controls">
 
-        {% snippet 'snippets/month_selector.html', current_moth=c.month, months=c.months, day=c.day %}
+        {% snippet 'snippets/month_selector.html', current_month=c.month, months=c.months, day=c.day %}
 
         <select name="publisher">
               <option value='' {% if not c.publisher %} selected='selected' {% endif %} >All publishers</option>
