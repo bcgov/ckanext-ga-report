@@ -37,7 +37,7 @@
 					// disables graph controls to prevent over-ranging the other controls
 					// meaning start date can't be greater than the end date
 					$.each(document.getElementById(opposite).options, function() {
-						this.disabled = gather.includes(this.value);
+						this.disabled = (gather.indexOf(this.value) > -1);
 					});
 				};
 
