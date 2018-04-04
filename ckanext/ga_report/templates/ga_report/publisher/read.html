@@ -2,6 +2,8 @@
 
 {% block styles %}
   {{ super() }}
+
+  {# This is bad, need to migrate to fanstatic resourcing #}
     <link rel="stylesheet" type="text/css" href="/scripts/vendor/rickshaw.min.css"/>
     <link rel="stylesheet" type="text/css" href="/css/ga_report.css?1"/>
 <!-- 
@@ -50,19 +52,15 @@
   <hr class="ga-report-divider" />
   
   <div class="row-fluid">
-    <div class="ga row-fluid">
-      <div class="span4">
-        <div id="graph-legend-container">
-          <strong>Graph Legend</strong>
-          <div style="display: none;" id="legend_none">(No graph is loaded)</div>
-        </div>
+    <div class="ga flex">
+      <div id="graph-legend-container">
+        <h5>Graph Legend</h5>
+        <div style="display: none;" id="legend_none">(No graph is loaded)</div>
       </div>
 
-      <div class="span8">
-        {% if c.graph_data %}
-          {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
-        {% endif %}
-      </div>
+      {% if c.graph_data %}
+        {% snippet 'snippets/rickshaw_graph.html', items_json=c.graph_data, id='dataset-downloads', mode='line', colorscheme='munin' %}
+      {% endif %}
     </div>
   </div>
   
@@ -77,7 +75,7 @@
     <form style="margin-bottom:10px;" class="form-inline" action="{{ h.url_for(controller='ckanext.ga_report.controller:GaDatasetReport',action='read') }}" method="get">
       <div class="controls">
 
-        {% snippet 'snippets/month_selector.html', current_moth=c.month, months=c.months, day=c.day %}
+        {% snippet 'snippets/month_selector.html', current_month=c.month, months=c.months, day=c.day %}
 
         <select name="publisher">
               <option value='' {% if not c.publisher %} selected='selected' {% endif %} >All publishers</option>
