@@ -5,7 +5,10 @@ import json
 import logging
 import operator
 import collections
+import datetime
 from ckan.lib.base import (BaseController, c, render, request, response, abort)
+from ckan.controllers.api import ApiController
+
 from ckan.plugins import toolkit
 
 import sqlalchemy
@@ -412,6 +415,157 @@ class GaDatasetReport(BaseController):
 
         return render('ga_report/publisher/read.html')
 
+
+
+@toolkit.side_effect_free
+def api_site_usage(context, data_dict):
+
+    def _get_packages(publisher=None, month='', count=-1, package=None):
+        '''Returns the datasets in order of views'''
+        have_download_data = True
+        month = month or 'All'
+        if month != 'All':
+            have_download_data = month >= DOWNLOADS_AVAILABLE_FROM
+
+        if package is None:
+            q = model.Session.query(GA_Url,model.Package)\
+                .filter(model.Package.name==GA_Url.package_id)\
+                .filter(GA_Url.url.like('/dataset/%'))
+        else:
+            q = model.Session.query(GA_Url,model.Package)\
+                .filter(model.Package.name==GA_Url.package_id)\
+                .filter(GA_Url.url.like('/dataset/'+package))
+        if publisher:
+            q = q.filter(GA_Url.department_id==publisher)
+        q = q.filter(GA_Url.period_name==month)
+        q = q.order_by('ga_url.pageviews::int desc')
+        top_packages = []
+        if count == -1:
+            entries = q.all()
+        else:
+            entries = q.limit(count)
+
+        for entry,package in entries:
+            if package:
+                # Downloads ....
+                if have_download_data:
+                    dls = model.Session.query(GA_Stat).\
+                        filter(GA_Stat.stat_name=='Downloads').\
+                        filter(GA_Stat.key==package.name)
+                    if month != 'All':  # Fetch everything unless the month is specific
+                        dls = dls.filter(GA_Stat.period_name==month)
+                    downloads = 0
+                    for x in dls:
+                        downloads += int(x.value)
+                else:
+                    downloads = 'No data'
+                top_packages.append((package, entry.pageviews, entry.visits, downloads))
+            else:
+                log.warning('Could not find package associated package')
+
+        return top_packages
+
+    now = datetime.datetime.now()
+
+    start_year = now.year - 5
+    if data_dict.get('start_year'):
+        start_year = int(data_dict.get('start_year'))
+
+    start_month = now.month
+    if data_dict.get('start_month'):
+        start_month = int(data_dict.get('start_month'))
+
+    end_year = now.year
+    if data_dict.get('end_year'):
+        end_year = int(data_dict.get('end_year'))
+    
+    end_month = now.month
+    if data_dict.get('end_month'):
+        end_month = int(data_dict.get('end_month'))
+
+    if end_year > now.year:
+        end_year = now.year
+    
+    if end_year == now.year and end_month > now.month:
+        end_month = now.month
+
+    count = 20
+    if data_dict.get('count'):
+        count = int(data_dict.get('count'))
+    
+    if count > 100:
+        count = 100
+
+    publisher = None
+    if data_dict.get('publisher'):
+        publisher = data_dict.get('publisher')
+
+    
+    top20 = _get_packages(count=count, publisher=publisher)
+    year = start_year
+    month = start_month
+    months = []
+    
+    
+    while year <= end_year:
+        if month < 10:
+            m = str(year) + "-0" + str(month)
+        else:
+            m = str(year) + "-" + str(month)
+        months.append(m)
+        month = month+1 
+        if year == end_year and month > end_month:
+            year = year + 1 #break the loop
+
+        if year == end_year and month > now.month:
+            year = year + 1 #break the loop
+
+        if month > 12:
+            month = 1
+            year = year+1
+    
+    data = []
+    for p in top20:
+        month_info = {}
+        for m in months:
+            packInfo = _get_packages(package=p[0].name, month=m, publisher=publisher)
+            views = 0
+            visits = 0
+            downloads = 0
+            if len(packInfo) >= 1:
+                _, views, visits, downloads = packInfo[0]
+            
+            month_info[m] = {
+                "views": int(views),
+                "visits": int(visits),
+                "downloads": int(downloads)
+            }
+
+        data.append({
+            'name': p[0].name, 
+            'title': p[0].title, 
+            'month_info': month_info, 
+            'all_time_views': p[1],
+            'all_time_visits': p[2],
+            'all_time_downloads': p[3],
+        })
+
+    return {
+        # 'entries': entries,
+        # 'total': total,
+        # 'graph': graph,
+        # 'stats': stats,
+        # 'global_totals': c.global_totals,
+        'data': data
+        
+    }
+
+@toolkit.side_effect_free
+def api_publishers(context, data_dict):
+    return {
+        'publishers': _get_publishers()
+    }
+
 def _to_rickshaw(data, percentageMode=False):
     if data==[]:
         return data
@@ -543,3 +697,4 @@ def _get_publishers():
 def _percent(num, total):
     p = 100 * float(num)/float(total)
     return "%.2f%%" % round(p, 2)
+
