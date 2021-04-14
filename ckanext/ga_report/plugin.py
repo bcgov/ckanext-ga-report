@@ -2,6 +2,7 @@ import logging
 import ckan.lib.helpers as h
 import ckan.plugins as p
 from ckan.plugins import implements, toolkit
+import ckan.plugins as plugins
 
 from ckanext.ga_report.helpers import (most_popular_datasets,
                                        popular_datasets,
@@ -16,6 +17,7 @@ class GAReportPlugin(p.SingletonPlugin):
     implements(p.IConfigurer, inherit=True)
     implements(p.IRoutes, inherit=True)
     implements(p.ITemplateHelpers, inherit=True)
+    plugins.implements(plugins.IActions, inherit=True)
 
     def update_config(self, config):
         toolkit.add_template_directory(config, 'templates')
@@ -86,5 +88,14 @@ class GAReportPlugin(p.SingletonPlugin):
             controller='ckanext.ga_report.controller:GaDatasetReport',
             action='read_publisher'
         )
+
         return map
+
+
+    def get_actions(self):
+        import ckanext.ga_report.controller as ga
+        return {
+            'site-usage': ga.api_site_usage,
+            'publishers': ga.api_publishers
+        }
 
